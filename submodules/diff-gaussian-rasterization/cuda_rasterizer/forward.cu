@@ -750,6 +750,18 @@ void FORWARD::bw_score_gaussian(
 		blending_weight_score);
 }
 
+__device__ float atomicMax(float* address, float val)
+{
+    int* address_as_i = (int*)address;
+    int old = *address_as_i, assumed;
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_i, assumed,
+            __float_as_int(fmaxf(val, __int_as_float(assumed))));
+    } while (assumed != old);
+    return __int_as_float(old);
+}
+
 template <uint32_t CHANNELS>
 __global__ void __launch_bounds__(BLOCK_X * BLOCK_Y)
 renderCUDA_mw_score(
@@ -842,7 +854,7 @@ renderCUDA_mw_score(
 				done = true;
 				continue;
 			}
-			max_weight_score[collected_id[j]] = max(max_weight_score[collected_id[j]], alpha * T); // max weight
+			atomicMax(&(max_weight_score[collected_id[j]]), alpha * T); // max weight
 
 
 			// Eq. (3) from 3D Gaussian splatting paper.
